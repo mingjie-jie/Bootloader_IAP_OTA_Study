@@ -15,6 +15,18 @@ class RepositoryTests(unittest.TestCase):
             "configs/application/MY_OTA_JUMP.h",
             "docs/02_上电启动全流程.md", "docs/03_源码逐函数精读.md",
             "docs/06_IAP与OTA完整升级设计.md", "docs/07_寄存器与汇编原理.md",
+            "docs/12_函数指针_BX_BLX与PC.md",
+            "docs/13_跳转前的严格条件与安全顺序.md",
+            "docs/14_FreeRTOS_PendSV_现场保存条件.md",
+            "docs/15_异常进入_异常返回_EXC_RETURN.md",
+            "docs/16_原始跳转代码_逐行状态表.md",
+            "docs/17_OTA升级与掉电恢复_深度设计.md",
+            "docs/18_寄存器观测_实机调试.md",
+            "docs/19_故障注入_选择题与参考答案.md",
+            "docs/20_官方启动文件_逐阶段深读.md",
+            "docs/21_GitHub更新_工程迁移与编码.md",
+            "tools/boot_flow_sim.py", "tools/flash_layout.py",
+            "linker-snippets/README.md",
         ]
         for name in must_exist:
             with self.subTest(path=name):

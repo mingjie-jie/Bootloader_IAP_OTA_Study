@@ -1,10 +1,28 @@
-# STM32H723 Bootloader / IAP / OTA 启动与升级原理学习仓库
+# STM32H723 Bootloader / IAP / OTA 启动、寄存器与 FreeRTOS 上下文学习仓库
 
+> **版本：v2.0（2026-11-24，较 v1.0 新增 10 章深度解析 + 交互式离线模拟脚本）**  
 > **研究对象：STM32H723VE（Cortex-M7，512 KiB 内部 Flash）**  
 > **资料来源：用户原始 `MY_OTA_JUMP.c`、`MY_OTA_JUMP.h`；技术核对来源：ST RM0468、STM32H723 GCC 启动文件。**  
 > **重要定位：本仓库是详细学习资料 + 原始源码留存 + 移植参考，并非开箱即用、经实机验证的完整 OTA 产品工程。**
 
 本工程专门回答：**STM32 上电到底如何启动？为什么向量表前 8 字节如此重要？UART 中断中为何不能直接安全切程序？为什么用 SRAM4 保留跳转请求并软件复位？Bootloader、IAP、OTA 怎样组成升级闭环？**
+
+## v2.0 新增重点：前版较简略的地方，现在深入到“CPU 怎么做”
+
+- [12 函数指针为什么能够跳转？](docs/12_函数指针_BX_BLX与PC.md)：`typedef void (*F)(void)`、函数指针、Thumb、BL/BLX/BX、PC。
+- [13 VTOR、CONTROL、MSP、BX 的严格前置条件](docs/13_跳转前的严格条件与安全顺序.md)：进入模式、权限、栈、屏蔽、异常、外设与恢复策略。
+- [14 FreeRTOS PendSV 现场保存](docs/14_FreeRTOS_PendSV_现场保存条件.md)：硬件/软件压栈、TCB、R0/R2、任务 PC、FPU、优先级。
+- [15 异常进入/异常返回/EXC_RETURN](docs/15_异常进入_异常返回_EXC_RETURN.md)：`0xFFFFFFFD`、SVC 如何启动第一个任务、`BX LR` 为什么恢复 PC。
+- [16 原始源码逐行状态表](docs/16_原始跳转代码_逐行状态表.md)：两条跳转方向不同的控制流和各寄存器状态变化。
+- [17 IAP/OTA 及掉电回滚深度设计](docs/17_OTA升级与掉电恢复_深度设计.md)：从固件打包、分包到擦写、确认、恢复与签名。
+- [18 Keil/CubeIDE 实机调试与寄存器观测](docs/18_寄存器观测_实机调试.md)：断点、Disassembly、HardFault、PSP/VTOR 逐步记录。
+- [19 28 道案例题与答案](docs/19_故障注入_选择题与参考答案.md)：故障注入、寄存器推断、OTA 失效模式。
+- [20 ST 官方 H723 GCC 启动文件解析](docs/20_官方启动文件_逐阶段深读.md)：新增 `ExitRun0Mode`、`.init_array`、`.data/.bss`。
+- [21 如何更新原有 GitHub 仓库](docs/21_GitHub更新_工程迁移与编码.md)：不删 `.git`、覆盖、提交和推送、解决乱码。
+
+新增的离线实用工具：[`boot_flow_sim.py`](tools/boot_flow_sim.py) 模拟双向跳转、[`flash_layout.py`](tools/flash_layout.py) 验证 H723VE 扇区分区；以及 [`linker-snippets/`](linker-snippets/) 的 SRAM4 保留说明。
+
+**阅读顺序建议：** 02 → 20 → 12 → 16 → 13 → 14 → 15 → 17 → 18 → 19。源码仍放 `original/` 原样保留，不会把“当前只有跳转”的代码误写成“OTA 已实现”。
 
 ## 0. 首先看结论
 
@@ -33,6 +51,16 @@
 | [docs/09_移植调试与测试清单.md](docs/09_移植调试与测试清单.md) | 从 CubeMX 双工程建立到实机测试的操作清单 | 实战 |
 | [docs/10_面试与复习问答.md](docs/10_面试与复习问答.md) | 高频问答、故障定位、归纳 | 复习 |
 | [docs/11_时序与状态图.md](docs/11_时序与状态图.md) | GitHub 支持的 Mermaid 详细可视化流程 | 画图 |
+| [docs/12_函数指针_BX_BLX与PC.md](docs/12_函数指针_BX_BLX与PC.md) | 函数指针/Thumb/BLX/BX 的底层机制 | **新增重点** |
+| [docs/13_跳转前的严格条件与安全顺序.md](docs/13_跳转前的严格条件与安全顺序.md) | VTOR/MSP/模式/中断的前置条件 | **新增重点** |
+| [docs/14_FreeRTOS_PendSV_现场保存条件.md](docs/14_FreeRTOS_PendSV_现场保存条件.md) | RTOS 任务栈与异常现场保存 | **新增重点** |
+| [docs/15_异常进入_异常返回_EXC_RETURN.md](docs/15_异常进入_异常返回_EXC_RETURN.md) | SVC/PendSV/EXC_RETURN | **新增重点** |
+| [docs/16_原始跳转代码_逐行状态表.md](docs/16_原始跳转代码_逐行状态表.md) | 源码逐行 + Boot/APP 双向时序 | **新增重点** |
+| [docs/17_OTA升级与掉电恢复_深度设计.md](docs/17_OTA升级与掉电恢复_深度设计.md) | 升级/掉电恢复/回滚事务设计 | **新增重点** |
+| [docs/18_寄存器观测_实机调试.md](docs/18_寄存器观测_实机调试.md) | 实机寄存器与断点追踪 | **新增** |
+| [docs/19_故障注入_选择题与参考答案.md](docs/19_故障注入_选择题与参考答案.md) | 28 道案例题与答案 | **新增** |
+| [docs/20_官方启动文件_逐阶段深读.md](docs/20_官方启动文件_逐阶段深读.md) | ST 官方 H723 启动汇编链路 | **新增重点** |
+| [docs/21_GitHub更新_工程迁移与编码.md](docs/21_GitHub更新_工程迁移与编码.md) | 更新旧 GitHub 仓库步骤 | **新增** |
 | [original/](original/) | **原样**保留上传源码 | 对照阅读 |
 | [configs/](configs/) | Bootloader / APP 两套头文件配置示例 | 集成 |
 | [examples/](examples/) | 参考级安全跳转片段与 UART 集成用法 | 集成 |
@@ -116,6 +144,9 @@ flowchart TD
 ```bash
 python3 -m unittest discover -s tests -v
 python3 tools/check_vectors.py app.bin --base 0x08020000 --flash-end 0x08080000
+python3 tools/boot_flow_sim.py --from boot --target app
+python3 tools/boot_flow_sim.py --from app --target boot
+python3 tools/flash_layout.py
 ```
 
 脚本只从本地 `.bin` 文件的开头解码 8 字节，不调用 STM32 编程器，更不会烧写芯片。
@@ -136,6 +167,8 @@ git push -u origin main
 其中 `<你的用户名>` 替换为自己的 GitHub 用户名（尖括号也要去掉）。如果尚未安装 Git，先安装 Git for Windows。
 
 ### 后续更新同一个仓库
+
+已经上传过旧版并想**保持旧仓库地址不变**，强烈建议先阅读 [21 更新原有 GitHub 仓库](docs/21_GitHub更新_工程迁移与编码.md)，将本包内容复制到**已有 `.git` 的仓库根目录**，不要直接重建一个同名仓库。
 
 ```powershell
 git status
