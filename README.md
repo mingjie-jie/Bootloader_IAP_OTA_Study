@@ -151,32 +151,6 @@ python3 tools/flash_layout.py
 
 脚本只从本地 `.bin` 文件的开头解码 8 字节，不调用 STM32 编程器，更不会烧写芯片。
 
-## 7. 一键上传到 GitHub（Windows PowerShell）
-
-先在 GitHub 网页创建一个**空仓库**，例如 `STM32H723-Bootloader-IAP-OTA`，不要初始化 README。下载本项目 ZIP 并解压后，进入解压文件夹，在 PowerShell 中执行：
-
-```powershell
-git init
-git add .
-git commit -m "docs: add STM32H723 bootloader IAP OTA study notes"
-git branch -M main
-git remote add origin https://github.com/<你的用户名>/STM32H723-Bootloader-IAP-OTA.git
-git push -u origin main
-```
-
-其中 `<你的用户名>` 替换为自己的 GitHub 用户名（尖括号也要去掉）。如果尚未安装 Git，先安装 Git for Windows。
-
-### 后续更新同一个仓库
-
-已经上传过旧版并想**保持旧仓库地址不变**，强烈建议先阅读 [21 更新原有 GitHub 仓库](docs/21_GitHub更新_工程迁移与编码.md)，将本包内容复制到**已有 `.git` 的仓库根目录**，不要直接重建一个同名仓库。
-
-```powershell
-git status
-git add .
-git commit -m "docs: expand startup and OTA upgrade flow"
-git push
-```
-
 ### 解决中文乱码
 
 本仓库所有 `.md`、`.c`、`.h`、`.py` 源文件均采用 **UTF-8**。VS Code 中点击右下角文件编码，选择 `Reopen with Encoding → UTF-8`；如本地文件来自旧版 GBK/ANSI，确认原有编码后用 `Save with Encoding → UTF-8` 转换。GitHub Markdown 直接支持 UTF-8。
